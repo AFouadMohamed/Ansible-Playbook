@@ -1,0 +1,152 @@
+---
+- name: install database by ansible
+  hosts: all
+  become: yes
+  vars:
+    root_password: "admin123"
+    mariadb_user: "root"
+    mariadb_password: "admin123"
+    git_repo: "https://github.com/hkhcoder/vprofile-project.git"
+    database_name: "accounts"
+    database_user: "admin"
+    database_user_password: "admin123"
+
+  tasks:
+    # Install necessary packages
+    - name: Install necessary packages
+      yum:
+        name:
+          - epel-release
+          - git
+          - mariadb-server
+        state: present
+
+    # Install python3-pip
+    - name: Install python3-pip
+      dnf:
+        name: python3-pip
+        state: present
+
+    # Install PyMySQL
+    - name: Install PyMySQL
+      pip:
+        name: PyMySQL
+        state: present
+        executable: pip3
+
+    # Start MariaDB service
+    - name: Start MariaDB service
+      service:
+        name: mariadb
+        state: started
+        enabled: yes
+
+    # Clone vProfile project repository
+    - name: Clone vProfile project repository
+      git:
+        repo: "{{ git_repo }}"
+        dest: /tmp/vprofile-project
+        version: main
+
+    # Set root password for MySQL
+    - name: Set root password for MySQL
+      mysql_user:
+        name: root
+        password: "{{ root_password }}"
+        login_unix_socket: /var/lib/mysql/mysql.sock
+        check_implicit_admin: yes
+        state: present
+
+    # Create database for accounts
+    - name: Create database for accounts
+      mysql_db:
+        name: "{{ database_name }}"
+        state: present
+        login_user: root
+        login_password: "{{ root_password }}"
+
+    # Create admin user and grant privileges on accounts database
+    - name: Create admin user and grant privileges on accounts database
+      mysql_user:
+        name: "{{ database_user }}"
+        password: "{{ database_user_password }}"
+        priv: "{{ database_name }}.*:ALL"
+        host: "{{ item }}"
+        state: present
+        login_user: root
+        login_password: "{{ root_password }}"
+      loop:
+        - "localhost"
+        - "%"
+
+    # Restore the database dump
+    - name: Restore the database dump
+      mysql_db:
+        name: "{{ database_name }}"
+        state: import
+        target: "/tmp/vprofile-project/src/main/resources/db_backup.sql"
+        login_user: root
+        login_password: "{{ root_password }}"
+
+    # Restart MariaDB service
+    - name: Restart MariaDB service
+      ansible.builtin.service:
+        name: mariadb
+        state: restarted
+
+    # Start and enable firewalld
+    - name: Start and enable firewalld
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    # Allow MariaDB through firewall
+    - name: Allow MariaDB through firewall
+      ansible.builtin.firewalld:
+        port: "3306/tcp"
+        permanent: true
+        state: enabled
+        immediate: yes
+
+    # Reload firewall
+    - name: Reload firewall
+      command: firewall-cmd --reload
+
+    # Restart MariaDB after firewall configuration
+    - name: Restart MariaDB after firewall configuration
+      ansible.builtin.service:
+        name: mariadb
+        state: restarted
+    
+     # add hosts to file host
+    - name: Add db01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.15 db01'
+        state: present
+    
+    - name: Add mc01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.14 mc01'
+        state: present
+
+    - name: Add rmq01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.13 rmq01'
+        state: present
+
+    - name: Add app01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.12 app01'
+        state: present
+
+    - name: Add web01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.11 web01'
+        state: present
+...

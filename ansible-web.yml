@@ -1,0 +1,84 @@
+---
+- name: Install Nginx by Ansible
+  hosts: all
+  become: yes
+  tasks:
+    # Install Nginx
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+    
+    # Config Nginx
+    - name: Create Nginx configuration for vproapp
+      copy:
+        content: |
+          upstream vproapp {
+              server app01:8080;
+          }
+
+          server {
+              listen 80;
+
+              location / {
+                  proxy_pass http://vproapp;
+              }
+          }
+        dest: /etc/nginx/sites-available/vproapp
+        owner: root
+        group: root
+        mode: '0644'
+
+    # Remove defulat config nginx   
+    - name: Remove default Nginx configuration
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    # Create link 
+    - name: Create symbolic link for the website
+      file:
+        src: /etc/nginx/sites-available/vproapp
+        dest: /etc/nginx/sites-enabled/vproapp
+        state: link
+    
+     
+     # add hosts to file host
+    - name: Add db01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.15 db01'
+        state: present
+    
+    - name: Add mc01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.14 mc01'
+        state: present
+
+    - name: Add rmq01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.13 rmq01'
+        state: present
+
+    - name: Add app01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.12 app01'
+        state: present
+
+    - name: Add web01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.11 web01'
+        state: present
+        
+    # Restart nginx
+    - name: Restart and enable Nginx
+      systemd:
+        name: nginx
+        state: restarted
+        enabled: true
+   
+...

@@ -1,0 +1,175 @@
+---
+- name: Install RabbitMQ by Ansible
+  hosts: all
+  become: yes
+  tasks:
+    # Install epel-release and wget packages
+    - name: Install epel-release and wget packages
+      yum:
+        name:
+          - epel-release
+          - wget
+        state: present
+    
+    # Install package 
+    - name: Install Package 
+      package:
+        name: 
+        - java-11-openjdk 
+        - java-11-openjdk-devel
+        - git 
+        - maven
+        - unzip
+        state: present
+
+    # Download Tomcat package
+    - name: Download Tomcat package
+      get_url:
+        url: "https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.75/bin/apache-tomcat-9.0.75.tar.gz"
+        dest: "/tmp/apache-tomcat-9.0.75.tar.gz"
+
+    # Extract Tomcat package
+    - name: Extract Tomcat package
+      unarchive:
+        src: "/tmp/apache-tomcat-9.0.75.tar.gz"
+        dest: "/tmp/"
+        remote_src: yes
+    
+    # Add tomcat user
+    - name: Add tomcat user
+      user:
+        name: tomcat
+        home: /usr/local/tomcat
+        shell: /sbin/nologin
+
+    # Copy data to tomcat home dir
+    - name: Copy data to tomcat home dir
+      copy:
+        src: /tmp/apache-tomcat-9.0.75/
+        dest: /usr/local/tomcat/
+        remote_src: true
+
+    # Make tomcat user owner of tomcat home dir
+    - name: Make tomcat user owner of tomcat home dir
+      file:
+        path: /usr/local/tomcat
+        owner: tomcat
+        group: tomcat
+        recurse: yes
+    #  Create tomcat service file
+    - name: Create tomcat service file
+      copy:
+        dest: /etc/systemd/system/tomcat.service
+        content: |
+          [Unit]
+          Description=Tomcat
+          After=network.target
+
+          [Service]
+          User=tomcat
+          WorkingDirectory=/usr/local/tomcat
+          Environment=JRE_HOME=/usr/lib/jvm/jre
+          Environment=JAVA_HOME=/usr/lib/jvm/jre
+          Environment=CATALINA_HOME=/usr/local/tomcat
+          Environment=CATALINE_BASE=/usr/local/tomcat
+          ExecStart=/usr/local/tomcat/bin/catalina.sh run
+          ExecStop=/usr/local/tomcat/bin/shutdown.sh
+          SyslogIdentifier=tomcat-%i
+
+          [Install]
+          WantedBy=multi-user.target
+    
+    # Reload system
+    - name: Reload systemd files
+      systemd:
+        daemon_reload: yes
+    
+    # Start and enable service
+    - name: Start and enable Tomcat service
+      systemd:
+        name: tomcat
+        state: started
+        enabled: yes
+
+    # Allow & config Firewall
+    - name: Start and enable firewalld
+      systemd:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Get active zones
+      command: firewall-cmd --get-active-zones
+
+    - name: Allow port 8080 through firewall
+      firewalld:
+        zone: public
+        permanent: yes
+        state: enabled
+        port: 8080/tcp
+      notify: Reload firewalld
+  
+  
+
+    # clone git repo
+    - name: Clone the Git repository
+      git:
+        repo: https://github.com/hkhcoder/vprofile-project.git
+        dest: /tmp/vagrant/vprofile-project
+        version: main
+    
+    # Build the code using Maven
+    - name: Build the code using Maven
+      become: yes
+      shell: mvn install
+      args:
+        chdir: "/tmp/vagrant/vprofile-project"
+    
+    # Deploy artifact to Tomcat server
+    - name: Deploy artifact to Tomcat server
+      become: yes
+      command: >
+        sh -c "systemctl stop tomcat &&
+        rm -rf /usr/local/tomcat/webapps/ROOT* &&
+        cp /tmp/vagrant/vprofile-project/target/vprofile-v2.war /usr/local/tomcat/webapps/ROOT.war &&
+        systemctl start tomcat &&
+        chown tomcat.tomcat /usr/local/tomcat/webapps -R &&
+        systemctl restart tomcat"
+    
+    # add hosts to file host
+    - name: Add db01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.15 db01'
+        state: present
+    
+    - name: Add mc01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.14 mc01'
+        state: present
+
+    - name: Add rmq01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.13 rmq01'
+        state: present
+
+    - name: Add app01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.12 app01'
+        state: present
+
+    - name: Add web01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.11 web01'
+        state: present
+
+  handlers:
+    - name: Reload firewalld
+      service:
+        name: firewalld
+        state: reloaded
+...

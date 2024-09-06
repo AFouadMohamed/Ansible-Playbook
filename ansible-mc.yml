@@ -1,0 +1,98 @@
+---
+- name: Install Memcache by Ansible
+  hosts: all
+  become: yes
+  tasks:
+    # Install necessary packages
+    - name: Install necessary packages
+      yum:
+        name:
+          - epel-release
+          - memcached
+        state: present
+        update_cache: yes
+
+    # Start Memchache service
+    - name: Start Memcache service
+      service:
+        name: memcached
+        state: started
+        enabled: yes
+     
+     # Change IP 
+    - name: Replace IP in memcached config file
+      replace:
+        path: /etc/sysconfig/memcached
+        regexp: '127\.0\.0\.1'
+        replace: '0.0.0.0'
+
+     #  Restart Memchache services
+    - name: Restart memcached service
+      systemd:
+        name: memcached
+        state: restarted
+    
+
+    # Start and enable firewalld
+    - name: Start and enable firewalld
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+     #Allow MariaDB through firewall
+    - name: Allow MariaDB through firewall
+      ansible.builtin.firewalld:
+        port: "11211/tcp"
+        permanent: true
+        state: enabled
+        immediate: yes
+    
+     # Reload firewall
+    - name: Reload firewall
+      command: firewall-cmd --reload
+    
+     #  Restart Memchache services
+    - name: Restart memcached service
+      systemd:
+        name: memcached
+        state: restarted
+    
+     # add hosts to file host
+    - name: Add db01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.15 db01'
+        state: present
+    
+    - name: Add mc01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.14 mc01'
+        state: present
+
+    - name: Add rmq01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.13 rmq01'
+        state: present
+
+    - name: Add app01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.12 app01'
+        state: present
+
+    - name: Add web01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.11 web01'
+        state: present
+...
+
+
+
+
+
+...
+

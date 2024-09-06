@@ -1,0 +1,110 @@
+---
+- name: Install RabbitMQ by Ansible
+  hosts: all
+  become: yes
+  tasks:
+    # Install epel-release and wget packages
+    - name: Install epel-release and wget packages
+      yum:
+        name:
+          - epel-release
+          - wget
+        state: present
+
+    # Install CentOS RabbitMQ repository
+    - name: Install CentOS RabbitMQ repository
+      package:
+        name: centos-release-rabbitmq-38
+        state: present
+
+    # Install RabbitMQ Server
+    - name: Install RabbitMQ Server
+      package:
+        name: rabbitmq-server
+        state: present
+      
+    # Enable and start RabbitMQ service
+    - name: Enable and start RabbitMQ service
+      systemd:
+        name: rabbitmq-server
+        enabled: yes
+        state: started
+
+    # Add RabbitMQ configuration
+    - name: Add RabbitMQ configuration
+      copy:
+        content: |
+          [{rabbit, [{loopback_users, []}]}].
+        dest: /etc/rabbitmq/rabbitmq.config
+        mode: '0644'
+     
+    # Add RabbitMQ user
+    - name: Add RabbitMQ user
+      command: rabbitmqctl add_user test test
+    
+    # Config user
+    - name: Set user tags
+      command: rabbitmqctl set_user_tags test administrator
+    
+    # Restart RabbitMQ service
+    - name: Restart RabbitMQ service
+      systemd:
+        name: rabbitmq-server
+        state: restarted
+
+    # Start and enable firewalld
+    - name: Start and enable firewalld
+      service:
+        name: firewalld
+        enabled: yes
+        state: started
+
+    # Allow RabbitMQ through firewall
+    - name: Allow RabbitMQ through firewall
+      firewalld:
+        port: 5672/tcp
+        permanent: true
+        state: enabled
+        immediate: yes
+
+    # Reload firewall
+    - name: Reload firewall
+      command: firewall-cmd --reload
+    
+    # Restart RabbitMQ service
+    - name: Restart RabbitMQ service
+      systemd:
+        name: rabbitmq-server
+        state: restarted
+    
+     # add hosts to file host
+    - name: Add db01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.15 db01'
+        state: present
+    
+    - name: Add mc01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.14 mc01'
+        state: present
+
+    - name: Add rmq01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.13 rmq01'
+        state: present
+
+    - name: Add app01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.12 app01'
+        state: present
+
+    - name: Add web01 to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: '192.168.56.11 web01'
+        state: present
+...
